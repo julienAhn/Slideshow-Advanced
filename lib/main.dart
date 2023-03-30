@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_image_slideshow/flutter_image_slideshow.dart';
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Slideshow',
+      title: 'Slideshow Advanced (Made by Julien Ahn)',
       home: HomePage(),
     );
   }
@@ -36,7 +37,18 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<String> _imagePaths = [];
   List<Widget> _widgetImageList = [];
+  late Directory _rootDirectory;
+  late Directory _currentDirectory;
+  List<Directory> _selectedDirectories = [];
 
+  @override
+  void initState() {
+    super.initState();
+    _rootDirectory = Directory('/');
+    _currentDirectory = _rootDirectory;
+  }
+
+  /*
   Future<void> _selectFolders() async {
     final List<Directory>? selectedDirectories = await showDialog<List<Directory>>(
       context: context,
@@ -54,70 +66,23 @@ class _HomePageState extends State<HomePage> {
       });
     }
   }
+  */
 
-  Future<List<String>> _getImagePaths(String folderPath) async {
+  Future<void> addImagePaths(String folderPath) async {
     List<String> imagePaths = [];
     Directory folder = Directory(folderPath);
     List<FileSystemEntity> entities = await folder.list().toList();
     for (FileSystemEntity entity in entities) {
       if (entity is File) {
         String path = entity.path;
-        if (path.endsWith('.jpg') || path.endsWith('.png')) {
-          imagePaths.add(path);
-          _widgetImageList.add(Image.file(File(path)));
+        if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.jpeg')) {
+          setState(() {
+            _imagePaths.add(path);
+            _widgetImageList.add(Image.file(File(path)));
+          });
         }
       }
     }
-    return imagePaths;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Slideshow'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: _selectFolders,
-              child: Text('Select Folders'),
-            ),
-            SizedBox(height: 20),
-            _imagePaths.isEmpty
-                ? Text('No Images Selected')
-                : Expanded(
-              child: ImageSlideshow(
-                children: _widgetImageList,
-                autoPlayInterval: 3000,
-                isLoop: true,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class FolderPickerDialog extends StatefulWidget {
-  @override
-  _FolderPickerDialogState createState() => _FolderPickerDialogState();
-}
-
-class _FolderPickerDialogState extends State<FolderPickerDialog> {
-  late Directory _rootDirectory;
-  late Directory _currentDirectory;
-  late List<Directory> _selectedDirectories;
-
-  @override
-  void initState() {
-    super.initState();
-    _rootDirectory = Directory('/');
-    _currentDirectory = _rootDirectory;
-    _selectedDirectories = [];
   }
 
   Future<void> _selectDirectory(Directory directory) async {
@@ -142,123 +107,133 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
     await _selectDirectory(parentDirectory);
   }
 
-  Future<List<Directory>> _selectFolders() async {
-    //await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
-    //await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft,]);
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Select Folders'),
-          content: Container(
-            width: double.maxFinite,
-            height: 500,
-            child: Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _currentDirectory.listSync().length,
-                    itemBuilder: (BuildContext context, int index) {
-                      FileSystemEntity entity = _currentDirectory.listSync()[index];
-                      return ListTile(
-                        leading: entity is Directory
-                            ? Icon(Icons.folder)
-                            : Icon(Icons.insert_drive_file),
-                        title: Text(entity.path.split('/').last),
-                        onTap: () async {
-                          if (entity is Directory) {
-                            await _selectDirectory(entity);
-                          } else {
-                            await _toggleDirectorySelection(_currentDirectory);
-                          }
-                        },
-                        selected: _selectedDirectories.contains(entity),
-                      );
-                    },
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_upward),
-                      onPressed: _currentDirectory.path == _rootDirectory.path
-                          ? null
-                          : _navigateUp,
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop(_selectedDirectories);
-                      },
-                      child: Text('Select'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  Future<void> chooseDirectory() async {
+    /*
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'png', 'mp4', 'jpeg'],
     );
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-    return _selectedDirectories;
+    */
+
+    String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+
+    if (selectedDirectory != null) {
+      print("selected Directory: " + selectedDirectory);
+      print("directory empty: " + selectedDirectory.isEmpty.toString());
+      setState(() {
+        addDirectory(selectedDirectory);
+        addImagePaths(selectedDirectory);
+      });
+    }
+  }
+
+  void addDirectory(String directoryName) {
+
+    Directory folder = Directory(directoryName);
+    setState(() {
+      _selectedDirectories.add(folder);
+    });
+  }
+
+  void chooseDirectories() async {
+    print("HERE");
+    for (Directory dir in _selectedDirectories){
+      print(dir.path);
+    }
+    showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return StatefulBuilder(
+              builder: (context, setState) => AlertDialog(
+            title: Text('Selected Folders'),
+            content: Container(
+              width: double.maxFinite,
+              height: 500,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _selectedDirectories.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        Directory entity = _selectedDirectories[index];
+                        return ListTile(
+                          leading: entity is Directory
+                              ? Icon(Icons.folder)
+                              : Icon(Icons.insert_drive_file),
+                          title: Text(entity.path.split('/').last),
+                          trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: (){
+                                setState(() {
+                                  _selectedDirectories.remove(entity);
+                                });
+                              }),
+                          onTap: () async {
+                            if (entity is Directory) {
+                              await _selectDirectory(entity);
+                            } else {
+                              await _toggleDirectorySelection(_currentDirectory);
+                            }
+                          },
+                          selected: _selectedDirectories.contains(entity),
+                        );
+                      },
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_upward),
+                        onPressed: _currentDirectory.path == _rootDirectory.path
+                            ? null
+                            : _navigateUp,
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            chooseDirectory();
+                          });
+                        },
+                        child: Text('Select'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ));
+        });
   }
 
   @override
   Widget build(BuildContext context) {
-        return AlertDialog(
-          title: Text('Select Folders'),
-          content: Container(
-            width: double.maxFinite,
-            height: 500,
-            child: Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _currentDirectory.listSync().length,
-                    itemBuilder: (BuildContext context, int index) {
-                      FileSystemEntity entity = _currentDirectory.listSync()[index];
-                      return ListTile(
-                        leading: entity is Directory
-                            ? Icon(Icons.folder)
-                            : Icon(Icons.insert_drive_file),
-                        title: Text(entity.path.split('/').last),
-                        onTap: () async {
-                          if (entity is Directory) {
-                            await _selectDirectory(entity);
-                          } else {
-                            await _toggleDirectorySelection(_currentDirectory);
-                          }
-                        },
-                        selected: _selectedDirectories.contains(entity),
-                      );
-                    },
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_upward),
-                      onPressed: _currentDirectory.path == _rootDirectory.path
-                          ? null
-                          : _navigateUp,
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop(_selectedDirectories);
-                      },
-                      child: Text('Select'),
-                    ),
-                  ],
-                ),
-              ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Slideshow'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: chooseDirectories,
+              child: Text('Select Folders'),
             ),
-          ),
-        );
+            SizedBox(height: 20),
+            _imagePaths.isEmpty
+                ? Text('No Images Selected')
+                : Expanded(
+              child: ImageSlideshow(
+                children: _widgetImageList,
+                autoPlayInterval: 3000,
+                isLoop: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
+
