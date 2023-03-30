@@ -20,6 +20,28 @@ void main() {
   runApp(MyApp());
 }
 
+class Folder {
+  late Directory directory;
+
+  Folder(Directory directory) {
+    this.directory = directory;
+  }
+
+  int getNumberOfImages(){
+    List file = this.directory.listSync(recursive: true);
+    return file.length;
+  }
+
+  String toString2(){
+    return directory.path;
+  }
+
+  String get path {
+    return directory.path;
+  }
+
+}
+
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -39,7 +61,7 @@ class _HomePageState extends State<HomePage> {
   List<String> _imagePaths = [];
   List<Widget> _widgetImageList = [];
   late Directory _currentDirectory;
-  List<Directory> _selectedDirectories = [];
+  List<Folder> _selectedDirectories = [];
   late SharedPreferences prefs;
 
   @override
@@ -54,8 +76,7 @@ class _HomePageState extends State<HomePage> {
 
     List<String> selectedDirectoriesNames = prefs.getStringList('directories') ?? [];
     for (String directoryName in selectedDirectoriesNames){
-      print("awfaf: " + directoryName);
-      _selectedDirectories.add(Directory(directoryName));
+      _selectedDirectories.add(Folder(Directory(directoryName)));
       addImagePaths(directoryName);
     }
   }
@@ -109,7 +130,7 @@ class _HomePageState extends State<HomePage> {
       if (_selectedDirectories.contains(directory)) {
         _selectedDirectories.remove(directory);
       } else {
-        _selectedDirectories.add(directory);
+        _selectedDirectories.add(Folder(directory));
       }
     });
   }
@@ -142,17 +163,17 @@ class _HomePageState extends State<HomePage> {
 
   void addDirectory(String directoryName) {
 
-    Directory folder = Directory(directoryName);
+    Folder directory = Folder(Directory(directoryName));
     setState(() {
-      _selectedDirectories.add(folder);
+      _selectedDirectories.add(directory);
       prefs.setStringList('directories', listToString(_selectedDirectories));
     });
   }
 
-  List<String> listToString(List list){
+  List<String> listToString(List<Folder> list){
     List<String> listString = [];
-    for (Directory i in list){
-      listString.add(i.path);
+    for (Folder f in list){
+      listString.add(f.toString2());
     }
     return listString;
   }
@@ -174,12 +195,13 @@ class _HomePageState extends State<HomePage> {
                     child: ListView.builder(
                       itemCount: _selectedDirectories.length,
                       itemBuilder: (BuildContext context, int index) {
-                        Directory entity = _selectedDirectories[index];
+                        Folder entity = _selectedDirectories[index];
                         return ListTile(
-                          leading: entity is Directory
+                          leading: entity is Folder
                               ? Icon(Icons.folder)
                               : Icon(Icons.insert_drive_file),
                           title: Text(entity.path.split('/').last),
+                          subtitle: Text(entity.getNumberOfImages().toString() + " Images"),
                           trailing: IconButton(
                               icon: const Icon(Icons.delete_outline),
                               onPressed: (){
@@ -191,7 +213,7 @@ class _HomePageState extends State<HomePage> {
                               }),
                           onTap: () async {
                             if (entity is Directory) {
-                              await _selectDirectory(entity);
+                              await _selectDirectory(entity.directory);
                             } else {
                               await _toggleDirectorySelection(_currentDirectory);
                             }
