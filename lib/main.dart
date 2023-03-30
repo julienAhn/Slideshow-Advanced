@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_slide_show/image_slide_show.dart';
+import 'package:flutter_image_slideshow/flutter_image_slideshow.dart';
 
 /*
 Explanation:
@@ -35,6 +35,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List<String> _imagePaths = [];
+  List<Widget> _widgetImageList = [];
 
   Future<void> _selectFolders() async {
     final List<Directory>? selectedDirectories = await showDialog<List<Directory>>(
@@ -63,6 +64,7 @@ class _HomePageState extends State<HomePage> {
         String path = entity.path;
         if (path.endsWith('.jpg') || path.endsWith('.png')) {
           imagePaths.add(path);
+          _widgetImageList.add(Image.file(File(path)));
         }
       }
     }
@@ -87,10 +89,9 @@ class _HomePageState extends State<HomePage> {
             _imagePaths.isEmpty
                 ? Text('No Images Selected')
                 : Expanded(
-              child: ImageSlideShow(
-                imageUrls: _imagePaths,
-                interval: Duration(seconds: 3),
-                isAutoPlay: true,
+              child: ImageSlideshow(
+                children: _widgetImageList,
+                autoPlayInterval: 3000,
                 isLoop: true,
               ),
             ),
@@ -142,8 +143,8 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
   }
 
   Future<List<Directory>> _selectFolders() async {
-    await SystemChrome.setEnabledSystemUIOverlays([]);
-    await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft,]);
+    //await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
+    //await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft,]);
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -199,10 +200,65 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
         );
       },
     );
-    await SystemChrome.setEnabledSystemUIOverlays(SystemUiOverlay.values);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
     return _selectedDirectories;
+  }
 
+  @override
+  Widget build(BuildContext context) {
+        return AlertDialog(
+          title: Text('Select Folders'),
+          content: Container(
+            width: double.maxFinite,
+            height: 500,
+            child: Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _currentDirectory.listSync().length,
+                    itemBuilder: (BuildContext context, int index) {
+                      FileSystemEntity entity = _currentDirectory.listSync()[index];
+                      return ListTile(
+                        leading: entity is Directory
+                            ? Icon(Icons.folder)
+                            : Icon(Icons.insert_drive_file),
+                        title: Text(entity.path.split('/').last),
+                        onTap: () async {
+                          if (entity is Directory) {
+                            await _selectDirectory(entity);
+                          } else {
+                            await _toggleDirectorySelection(_currentDirectory);
+                          }
+                        },
+                        selected: _selectedDirectories.contains(entity),
+                      );
+                    },
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_upward),
+                      onPressed: _currentDirectory.path == _rootDirectory.path
+                          ? null
+                          : _navigateUp,
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(_selectedDirectories);
+                      },
+                      child: Text('Select'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+  }
+}
