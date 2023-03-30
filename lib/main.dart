@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_image_slideshow/flutter_image_slideshow.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /*
 Explanation:
@@ -37,15 +38,26 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<String> _imagePaths = [];
   List<Widget> _widgetImageList = [];
-  late Directory _rootDirectory;
   late Directory _currentDirectory;
   List<Directory> _selectedDirectories = [];
+  late SharedPreferences prefs;
 
   @override
   void initState() {
     super.initState();
-    _rootDirectory = Directory('/');
-    _currentDirectory = _rootDirectory;
+    initPref();
+
+  }
+
+  void initPref() async {
+    prefs = await SharedPreferences.getInstance();
+
+    List<String> selectedDirectoriesNames = prefs.getStringList('directories') ?? [];
+    for (String directoryName in selectedDirectoriesNames){
+      print("awfaf: " + directoryName);
+      _selectedDirectories.add(Directory(directoryName));
+      addImagePaths(directoryName);
+    }
   }
 
   /*
@@ -69,6 +81,7 @@ class _HomePageState extends State<HomePage> {
   */
 
   Future<void> addImagePaths(String folderPath) async {
+    print(folderPath);
     List<String> imagePaths = [];
     Directory folder = Directory(folderPath);
     List<FileSystemEntity> entities = await folder.list().toList();
@@ -132,14 +145,20 @@ class _HomePageState extends State<HomePage> {
     Directory folder = Directory(directoryName);
     setState(() {
       _selectedDirectories.add(folder);
+      prefs.setStringList('directories', listToString(_selectedDirectories));
     });
   }
 
-  void chooseDirectories() async {
-    print("HERE");
-    for (Directory dir in _selectedDirectories){
-      print(dir.path);
+  List<String> listToString(List list){
+    List<String> listString = [];
+    for (Directory i in list){
+      listString.add(i.path);
     }
+    return listString;
+  }
+
+  void chooseDirectories() async {
+
     showDialog(
         context: context,
         builder: (BuildContext context) {
@@ -166,6 +185,8 @@ class _HomePageState extends State<HomePage> {
                               onPressed: (){
                                 setState(() {
                                   _selectedDirectories.remove(entity);
+                                  _imagePaths.remove(entity.path);
+                                  prefs.setStringList('directories', listToString(_selectedDirectories));
                                 });
                               }),
                           onTap: () async {
@@ -183,12 +204,6 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      IconButton(
-                        icon: Icon(Icons.arrow_upward),
-                        onPressed: _currentDirectory.path == _rootDirectory.path
-                            ? null
-                            : _navigateUp,
-                      ),
                       ElevatedButton(
                         onPressed: () {
                           setState(() {
@@ -211,16 +226,17 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Slideshow'),
+        actions: [
+          IconButton(
+          onPressed: chooseDirectories,
+          icon: const Icon(Icons.add),
+          ),
+        ],
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ElevatedButton(
-              onPressed: chooseDirectories,
-              child: Text('Select Folders'),
-            ),
-            SizedBox(height: 20),
             _imagePaths.isEmpty
                 ? Text('No Images Selected')
                 : Expanded(
@@ -228,6 +244,8 @@ class _HomePageState extends State<HomePage> {
                 children: _widgetImageList,
                 autoPlayInterval: 3000,
                 isLoop: true,
+                indicatorRadius: 0,
+                indicatorBackgroundColor: Colors.black
               ),
             ),
           ],
