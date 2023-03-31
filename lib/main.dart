@@ -65,6 +65,10 @@ class Folder {
     return _directory.path;
   }
 
+  String get name {
+    return _directory.toString();
+  }
+
   Directory get directory {
     return _directory;
   }
@@ -79,7 +83,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Slideshow Advanced (Made by Julien Ahn)',
+      title: 'Slideshow Advanced - J.A',
       home: HomePage(),
     );
   }
@@ -97,6 +101,8 @@ class _HomePageState extends State<HomePage> {
   List<Folder> _selectedDirectories = [];
   late SharedPreferences prefs;
   int _autoplayInterval = 3000;
+  String _currentTitle = "";
+  List<String> _titleList = [];
 
   @override
   void initState() {
@@ -109,10 +115,12 @@ class _HomePageState extends State<HomePage> {
     prefs = await SharedPreferences.getInstance();
 
     List<String> selectedDirectoriesNames = prefs.getStringList('directories') ?? [];
+
     for (String directoryName in selectedDirectoriesNames){
       _selectedDirectories.add(Folder(Directory(directoryName)));
-      addImagePaths(directoryName);
     }
+
+    addImagePathsAdvanced(_selectedDirectories);
   }
 
   /*
@@ -135,47 +143,24 @@ class _HomePageState extends State<HomePage> {
   }
   */
 
-  Future<void> addImagePaths(String folderPath) async {
-    print(folderPath);
-    List<String> imagePaths = [];
-    Directory folder = Directory(folderPath);
-    List<FileSystemEntity> entities = await folder.list().toList();
-    for (FileSystemEntity entity in entities) {
-      if (entity is File) {
-        String path = entity.path;
-        if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.jpeg')) {
-          setState(() {
-            _imagePaths.add(path);
-            _widgetImageList.add(Image.file(File(path)));
-          });
-        }
-      }
-    }
-  }
-
-  Future<void> addImagePathsAdvanced(Folder folder) async {
+  Future<void> addImagePathsAdvanced(List<Folder> folders) async {
     List<String> allImagePaths = [];
-    List<FileSystemEntity> entities = await folder.directory.list(recursive: true).toList();
-    for (FileSystemEntity entity in entities) {
-      if (entity is File) {
-        String path = entity.path;
-        if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.jpeg')) {
-          setState(() {
-            allImagePaths.add(path);
-            _imagePaths.add(path);
-            _widgetImageList.add(Image.file(File(path)));
-          });
+    for(Folder folder in folders){
+      List<FileSystemEntity> entities = await folder.directory.list(recursive: true).toList();
+      for (FileSystemEntity entity in entities) {
+        if (entity is File) {
+          String path = entity.path;
+          if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.jpeg')) {
+            setState(() {
+              allImagePaths.add(path);
+              _imagePaths.add(path);
+              _widgetImageList.add(Image.file(File(path)));
+              _titleList.add(folder.name);
+            });
+          }
         }
       }
     }
-    setState(() {
-      int numberOfImages = (folder.getNumberOfImages() * folder.percentage ~/ 100);
-      List<String> newImages = allImagePaths.sample(numberOfImages);
-      _imagePaths = newImages;
-      for (String path in newImages){
-        _widgetImageList.add(Image.file(File(path)));
-      }
-    });
   }
 
 
@@ -202,12 +187,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> chooseDirectory() async {
-    /*
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['jpg', 'png', 'mp4', 'jpeg'],
-    );
-    */
 
     String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
 
@@ -215,17 +194,35 @@ class _HomePageState extends State<HomePage> {
       print("selected Directory: " + selectedDirectory);
       print("directory empty: " + selectedDirectory.isEmpty.toString());
       setState(() {
-        addDirectory(selectedDirectory);
-        addImagePaths(selectedDirectory);
+        List<Folder> folders = getSubDirectories(selectedDirectory);
+        addSubDirectories(folders);
+        addImagePathsAdvanced(folders);
       });
     }
   }
 
-  void addDirectory(String directoryName) {
+  // if no subfolder return current directory
+  List<Folder> getSubDirectories(String directoryName) {
+    List<Folder> folderList = [];
+    List fileAndFolders = Directory(directoryName).listSync(recursive: true);
+    for (var i in fileAndFolders){
+      if (i is Directory){
+        folderList.add(Folder(i));
+      }
+    }
 
-    Folder directory = Folder(Directory(directoryName));
+    if(folderList.isEmpty){
+      return [Folder(Directory(directoryName))];
+    }
+    else{
+      return folderList;
+    }
+  }
+
+  void addSubDirectories(List<Folder> folders) {
+
     setState(() {
-      _selectedDirectories.add(directory);
+      _selectedDirectories = _selectedDirectories + folders;
       prefs.setStringList('directories', listToString(_selectedDirectories));
     });
   }
@@ -323,12 +320,25 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    print(_autoplayInterval);
+    print("_autoplayInterval" + _autoplayInterval.toString());
+    print("_currentTitle" + _currentTitle);
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text('Slideshow Advanced (Made by Julien Ahn)'),
+        centerTitle: true,
+        backgroundColor: Colors.black,
+        leading: Row(
+            children: const [
+              Image(image: AssetImage('assets/personal_logo2.png')),
+              Image(image: AssetImage('assets/logo_einheit2.jpg'))
+            ]),
+        leadingWidth: 200,
+        title: Text(_currentTitle),
         actions: [
+          IconButton(
+            onPressed: pauseUnpauseSlideShow,
+            icon: const Icon(Icons.refresh),
+          ),
           IconButton(
             onPressed: pauseUnpauseSlideShow,
             icon: _autoplayInterval != 0 ? const Icon(Icons.stop_rounded) : const Icon(Icons.play_arrow_rounded),
@@ -352,7 +362,12 @@ class _HomePageState extends State<HomePage> {
                 autoPlayInterval: _autoplayInterval,
                 isLoop: true,
                 indicatorRadius: 0,
-                indicatorBackgroundColor: Colors.black
+                indicatorBackgroundColor: Colors.black,
+                onPageChanged: (int i){
+                  setState(() {
+                    _currentTitle = _titleList[i];
+                  });
+                },
               ),
             ),
           ],
