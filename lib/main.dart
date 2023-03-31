@@ -66,7 +66,11 @@ class Folder {
   }
 
   String get name {
-    return _directory.toString();
+    String wordToFind = 'Scouts Herbesthal';
+    int idx = _directory.path.indexOf(wordToFind);
+    String directoryName = _directory.path.substring(idx+wordToFind.length + 1);
+    directoryName = directoryName.replaceAll(r'\', ' - ');
+    return directoryName;
   }
 
   Directory get directory {
@@ -245,8 +249,14 @@ class _HomePageState extends State<HomePage> {
     return _imagePaths.length;
   }
 
-  double totalHoursOfSlideshow() {
-    return ((_imagePaths.length * _autoplayInterval/1000) / 60) / 60;
+  String totalHoursOfSlideshow() {
+    double hours = ((_imagePaths.length * _autoplayInterval/1000) / 60) / 60;
+    if (hours < 1){
+      return (hours*60).toString() + " minutes";
+    }
+    else{
+      return (hours).toString() + " hours";
+    }
   }
 
   void chooseDirectories() async {
@@ -264,7 +274,7 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("TOTAL images: " + totalNumberOfImages().toString()),
-                  Text("TOTAL hours of slideshow: " + totalHoursOfSlideshow().toString()),
+                  Text("TOTAL hours of slideshow: " + totalHoursOfSlideshow()),
                   SizedBox(height: 30),
                   Expanded(
                     child: ListView.builder(
