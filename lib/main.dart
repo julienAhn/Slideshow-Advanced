@@ -63,6 +63,7 @@ class _HomePageState extends State<HomePage> {
   late Directory _currentDirectory;
   List<Folder> _selectedDirectories = [];
   late SharedPreferences prefs;
+  int _autoplayInterval = 3000;
 
   @override
   void initState() {
@@ -178,6 +179,12 @@ class _HomePageState extends State<HomePage> {
     return listString;
   }
 
+  void pauseUnpauseSlideShow() {
+    setState(() {
+      _autoplayInterval = _autoplayInterval == 0 ? 3000 : 0;
+    });
+  }
+
   void chooseDirectories() async {
 
     showDialog(
@@ -232,7 +239,7 @@ class _HomePageState extends State<HomePage> {
                             chooseDirectory();
                           });
                         },
-                        child: Text('Select'),
+                        child: Text('Add'),
                       ),
                     ],
                   ),
@@ -245,14 +252,20 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    print(_autoplayInterval);
     return Scaffold(
       appBar: AppBar(
-        title: Text('Slideshow'),
+        title: Text('Slideshow Advanced (Made by Julien Ahn)'),
         actions: [
           IconButton(
-          onPressed: chooseDirectories,
-          icon: const Icon(Icons.add),
+            onPressed: pauseUnpauseSlideShow,
+            icon: _autoplayInterval != 0 ? const Icon(Icons.stop_rounded) : const Icon(Icons.play_arrow_rounded),
           ),
+          IconButton(
+            onPressed: chooseDirectories,
+            icon: const Icon(Icons.add),
+          ),
+
         ],
       ),
       body: Center(
@@ -264,7 +277,7 @@ class _HomePageState extends State<HomePage> {
                 : Expanded(
               child: ImageSlideshow(
                 children: _widgetImageList,
-                autoPlayInterval: 3000,
+                autoPlayInterval: _autoplayInterval,
                 isLoop: true,
                 indicatorRadius: 0,
                 indicatorBackgroundColor: Colors.black
