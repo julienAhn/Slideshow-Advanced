@@ -37,6 +37,7 @@ dependencies:
   flutter_image_slideshow: ^0.1.5
   file_picker: ^5.2.6
   shared_preferences: ^2.0.20
+  collection: ^1.17.0
 
 dev_dependencies:
   flutter_test:

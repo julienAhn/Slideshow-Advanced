@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,15 +22,39 @@ void main() {
 }
 
 class Folder {
-  late Directory directory;
+  late Directory _directory;
+  late int _percentage;
 
   Folder(Directory directory) {
-    this.directory = directory;
+    _directory = directory;
+    _percentage = calculatePercentage(directory);
   }
 
   int getNumberOfImages(){
-    List file = this.directory.listSync(recursive: true);
+    List file = _directory.listSync(recursive: true);
     return file.length;
+  }
+
+  int calculatePercentage(Directory directory){
+    int fileLength = directory.listSync(recursive: true).length;
+    if (fileLength < 20){
+      return 100;
+    }
+    else if (fileLength < 50){
+      return 80;
+    }
+    else if (fileLength < 80){
+      return 70;
+    }
+    else if (fileLength < 100){
+      return 50;
+    }
+    else if (fileLength < 200){
+      return 80;
+    }
+    else {
+      return 80;
+    }
   }
 
   String toString2(){
@@ -37,7 +62,15 @@ class Folder {
   }
 
   String get path {
-    return directory.path;
+    return _directory.path;
+  }
+
+  Directory get directory {
+    return _directory;
+  }
+
+  int get percentage {
+    return _percentage;
   }
 
 }
@@ -120,6 +153,32 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> addImagePathsAdvanced(Folder folder) async {
+    List<String> allImagePaths = [];
+    List<FileSystemEntity> entities = await folder.directory.list(recursive: true).toList();
+    for (FileSystemEntity entity in entities) {
+      if (entity is File) {
+        String path = entity.path;
+        if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.jpeg')) {
+          setState(() {
+            allImagePaths.add(path);
+            _imagePaths.add(path);
+            _widgetImageList.add(Image.file(File(path)));
+          });
+        }
+      }
+    }
+    setState(() {
+      int numberOfImages = (folder.getNumberOfImages() * folder.percentage ~/ 100);
+      List<String> newImages = allImagePaths.sample(numberOfImages);
+      _imagePaths = newImages;
+      for (String path in newImages){
+        _widgetImageList.add(Image.file(File(path)));
+      }
+    });
+  }
+
+
   Future<void> _selectDirectory(Directory directory) async {
     setState(() {
       _currentDirectory = directory;
@@ -185,6 +244,14 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  int totalNumberOfImages() {
+    return _imagePaths.length;
+  }
+
+  double totalHoursOfSlideshow() {
+    return ((_imagePaths.length * _autoplayInterval/1000) / 60) / 60;
+  }
+
   void chooseDirectories() async {
 
     showDialog(
@@ -197,7 +264,11 @@ class _HomePageState extends State<HomePage> {
               width: double.maxFinite,
               height: 500,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text("TOTAL images: " + totalNumberOfImages().toString()),
+                  Text("TOTAL hours of slideshow: " + totalHoursOfSlideshow().toString()),
+                  SizedBox(height: 30),
                   Expanded(
                     child: ListView.builder(
                       itemCount: _selectedDirectories.length,
@@ -208,7 +279,7 @@ class _HomePageState extends State<HomePage> {
                               ? Icon(Icons.folder)
                               : Icon(Icons.insert_drive_file),
                           title: Text(entity.path.split('/').last),
-                          subtitle: Text(entity.getNumberOfImages().toString() + " Images"),
+                          subtitle: Text(entity.getNumberOfImages().toString() + " Images" + " | Percentage = " + entity.percentage.toString() + "% | TOTAL = " + (entity.getNumberOfImages() * entity.percentage ~/ 100).toString()),
                           trailing: IconButton(
                               icon: const Icon(Icons.delete_outline),
                               onPressed: (){
@@ -254,6 +325,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     print(_autoplayInterval);
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text('Slideshow Advanced (Made by Julien Ahn)'),
         actions: [
