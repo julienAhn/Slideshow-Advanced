@@ -3,6 +3,7 @@ import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_image_slideshow/flutter_image_slideshow.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -23,37 +24,43 @@ void main() {
 
 class Folder {
   late Directory _directory;
-  late int _percentage;
 
   Folder(Directory directory) {
     _directory = directory;
-    _percentage = calculatePercentage(directory);
   }
 
   int getNumberOfImages(){
-    List file = _directory.listSync(recursive: true);
-    return file.length;
+    int counter = 0;
+    List files = _directory.listSync(recursive: false);
+    for (FileSystemEntity file in files) {
+      if (file is File) {
+        counter++;
+      }
+    }
+    return counter;
   }
 
-  int calculatePercentage(Directory directory){
-    int fileLength = directory.listSync(recursive: true).length;
-    if (fileLength < 20){
-      return 100;
+  //format: _percentages = [100,90,50,40,30] 5 entrys !!!
+  int getPercentage(List<int> percentages){
+
+    int fileLength = _directory.listSync(recursive: false).length;
+    if (fileLength <= 20){
+      return percentages[0];
     }
-    else if (fileLength < 50){
-      return 80;
+    else if (fileLength <= 50){
+      return percentages[1];
     }
-    else if (fileLength < 80){
-      return 70;
+    else if (fileLength <= 100){
+      return percentages[2];
     }
-    else if (fileLength < 100){
-      return 50;
+    else if (fileLength <= 200){
+      return percentages[3];
     }
-    else if (fileLength < 200){
-      return 80;
+    else if (fileLength >= 300){
+      return percentages[4];
     }
     else {
-      return 80;
+      return percentages[4];
     }
   }
 
@@ -76,11 +83,6 @@ class Folder {
   Directory get directory {
     return _directory;
   }
-
-  int get percentage {
-    return _percentage;
-  }
-
 }
 
 class MyApp extends StatelessWidget {
@@ -107,6 +109,9 @@ class _HomePageState extends State<HomePage> {
   int _autoplayInterval = 3000;
   String _currentTitle = "";
   List<String> _titleList = [];
+  List<int> _percentages = [100,90,50,40,30]; // <= 20; <= 50; <= 100 <= 200 >= 300
+  final myController = TextEditingController();
+  final _formKey = GlobalKey<FormBuilderState>();
 
   @override
   void initState() {
@@ -127,44 +132,64 @@ class _HomePageState extends State<HomePage> {
     addImagePathsAdvanced(_selectedDirectories);
   }
 
-  /*
-  Future<void> _selectFolders() async {
-    final List<Directory>? selectedDirectories = await showDialog<List<Directory>>(
-      context: context,
-      builder: (BuildContext context) {
-        return FolderPickerDialog();
-      },
-    );
-    if (selectedDirectories != null) {
-      List<String> allPaths = [];
-      for (Directory dir in selectedDirectories) {
-        allPaths.addAll(await _getImagePaths(dir.path));
-      }
-      setState(() {
-        _imagePaths = allPaths;
-      });
-    }
-  }
-  */
-
   Future<void> addImagePathsAdvanced(List<Folder> folders) async {
-    List<String> allImagePaths = [];
+
     for(Folder folder in folders){
-      List<FileSystemEntity> entities = await folder.directory.list(recursive: true).toList();
+      List<String> allImagePaths = [];
+      List<FileSystemEntity> entities = await folder.directory.list(recursive: false).toList();
       for (FileSystemEntity entity in entities) {
         if (entity is File) {
-          String path = entity.path;
+          String path = entity.path.toLowerCase();
           if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.jpeg')) {
-            setState(() {
               allImagePaths.add(path);
-              _imagePaths.add(path);
-              _widgetImageList.add(Image.file(File(path)));
-              _titleList.add(folder.name);
-            });
           }
         }
       }
+        int numberOfGeneratedImages = folder.getNumberOfImages() * folder.getPercentage(_percentages) ~/ 100;
+        numberOfGeneratedImages = numberOfGeneratedImages > allImagePaths.length ? allImagePaths.length : numberOfGeneratedImages;
+        List<String> randomGeneratedListOfPaths = allImagePaths.sample(numberOfGeneratedImages);
+        for(String rgPath in randomGeneratedListOfPaths){
+          _imagePaths.add(rgPath);
+          _widgetImageList.add(Image.file(File(rgPath)));
+          _titleList.add(folder.name);
+        }
+
     }
+    setState(() {
+    });
+  }
+
+  void refreshImagePathsAdvanced() async {
+
+    setState(() {
+      _titleList = [];
+      _imagePaths = [];
+      _widgetImageList = [];
+    });
+
+    for(Folder folder in _selectedDirectories){
+      List<String> allImagePaths = [];
+      List<FileSystemEntity> entities = await folder.directory.list(recursive: false).toList();
+      for (FileSystemEntity entity in entities) {
+        if (entity is File) {
+          String path = entity.path.toLowerCase();
+          if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.jpeg')) {
+            allImagePaths.add(path);
+          }
+        }
+      }
+      int numberOfGeneratedImages = folder.getNumberOfImages() * folder.getPercentage(_percentages) ~/ 100;
+      numberOfGeneratedImages = numberOfGeneratedImages > allImagePaths.length ? allImagePaths.length : numberOfGeneratedImages;
+      List<String> randomGeneratedListOfPaths = allImagePaths.sample(numberOfGeneratedImages);
+      for(String rgPath in randomGeneratedListOfPaths){
+        _imagePaths.add(rgPath);
+        _widgetImageList.add(Image.file(File(rgPath)));
+        _titleList.add(folder.name);
+      }
+
+    }
+    setState(() {
+    });
   }
 
 
@@ -182,12 +207,6 @@ class _HomePageState extends State<HomePage> {
         _selectedDirectories.add(Folder(directory));
       }
     });
-  }
-
-  Future<void> _navigateUp() async {
-    String parentPath = _currentDirectory.parent.path;
-    Directory parentDirectory = Directory(parentPath);
-    await _selectDirectory(parentDirectory);
   }
 
   Future<void> chooseDirectory() async {
@@ -259,6 +278,44 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> removeDirectory(Folder folder) async {
+
+    _selectedDirectories.remove(folder);
+    _titleList.remove(folder.path);
+
+    List<FileSystemEntity> entities = await folder.directory.list(recursive: false).toList();
+    for (FileSystemEntity entity in entities) {
+      if (entity is File) {
+        String path = entity.path;
+        if (path.endsWith('.jpg') || path.endsWith('.png') || path.endsWith('.jpeg')) {
+          setState(() {
+            if (_imagePaths.contains(path)){
+              _imagePaths.remove(path);
+              _widgetImageList.remove(Image.file(File(path)));
+            }
+          });
+        }
+      }
+    }
+
+    prefs.setStringList('directories', listToString(_selectedDirectories));
+  }
+
+  Future<void> removeAllDirectories() async {
+
+    setState(() {
+
+    _selectedDirectories = [];
+    _titleList = [];
+    _imagePaths = [];
+    _widgetImageList = [];
+    _currentTitle = "";
+
+    prefs.setStringList('directories', listToString(_selectedDirectories));
+
+    });
+  }
+
   void chooseDirectories() async {
 
     showDialog(
@@ -269,12 +326,76 @@ class _HomePageState extends State<HomePage> {
             title: Text('Selected Folders'),
             content: Container(
               width: double.maxFinite,
-              height: 500,
+              height: double.maxFinite,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("TOTAL images: " + totalNumberOfImages().toString()),
                   Text("TOTAL hours of slideshow: " + totalHoursOfSlideshow()),
+                  SizedBox(height: 30),
+                  // List<int> _percentages = [100,90,50,40,30]; // <= 20; <= 50; <= 100 <= 200 >= 300
+                  FormBuilder(
+                      key: _formKey ,
+                      child:
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            FormBuilderTextField(
+                              name: "1",
+                              initialValue: _percentages[0].toString(),
+                              decoration: new InputDecoration(labelText: "<= 20 | default 100%",),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly], // Only numbers can be entered
+                            ),
+                            SizedBox(height: 1),
+                            FormBuilderTextField(
+                              name: "2",
+                              initialValue: _percentages[1].toString(),
+                              decoration: new InputDecoration(labelText: "<= 50 | default 90%",),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly], // Only numbers can be entered
+                            ),
+                            SizedBox(height: 1),
+                            FormBuilderTextField(
+                              name: "3",
+                              initialValue: _percentages[2].toString(),
+                              decoration: new InputDecoration(labelText: "<= 100 | default 50%",),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly], // Only numbers can be entered
+                            ),
+                            SizedBox(height: 1),FormBuilderTextField(
+                              name: "4",
+                              initialValue: _percentages[3].toString(),
+                              decoration: new InputDecoration(labelText: "<= 200 | default 40%",),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly], // Only numbers can be entered
+                            ),
+                            SizedBox(height: 1),FormBuilderTextField(
+                              name: "5",
+                              initialValue: _percentages[4].toString(),
+                              decoration: new InputDecoration(labelText: ">= 300 | default 30%",),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly], // Only numbers can be entered
+                            ),
+                            SizedBox(height: 1),
+                            SizedBox(height: 20),
+                            ElevatedButton(
+                              onPressed: () {
+                                _formKey.currentState?.save();
+                                if (_formKey.currentState!.validate()) {
+                                  final formData = _formKey.currentState?.value;
+                                  setState(() {
+                                  _percentages[0] = int.parse(formData!["1"]);
+                                  _percentages[1] = int.parse(formData["2"]);
+                                  _percentages[2] = int.parse(formData["3"]);
+                                  _percentages[3] = int.parse(formData["4"]);
+                                  _percentages[4] = int.parse(formData["5"]);
+                                  });
+                                }
+                              },
+                              child: const Text('Submit'),
+                            ),
+                          ])),
                   SizedBox(height: 30),
                   Expanded(
                     child: ListView.builder(
@@ -286,22 +407,22 @@ class _HomePageState extends State<HomePage> {
                               ? Icon(Icons.folder)
                               : Icon(Icons.insert_drive_file),
                           title: Text(entity.path.split('/').last),
-                          subtitle: Text(entity.getNumberOfImages().toString() + " Images" + " | Percentage = " + entity.percentage.toString() + "% | TOTAL = " + (entity.getNumberOfImages() * entity.percentage ~/ 100).toString()),
+                          subtitle: Text(entity.getNumberOfImages().toString() + " Images" + " | Percentage = " + entity.getPercentage(_percentages).toString() + "% | TOTAL = " + (entity.getNumberOfImages() * entity.getPercentage(_percentages) ~/ 100).toString()),
                           trailing: IconButton(
                               icon: const Icon(Icons.delete_outline),
                               onPressed: (){
                                 setState(() {
-                                  _selectedDirectories.remove(entity);
-                                  _imagePaths.remove(entity.path);
-                                  prefs.setStringList('directories', listToString(_selectedDirectories));
+                                  removeDirectory(entity);
                                 });
                               }),
                           onTap: () async {
+                            /*
                             if (entity is Directory) {
                               await _selectDirectory(entity.directory);
                             } else {
                               await _toggleDirectorySelection(_currentDirectory);
                             }
+                            */
                           },
                           selected: _selectedDirectories.contains(entity),
                         );
@@ -319,6 +440,16 @@ class _HomePageState extends State<HomePage> {
                         },
                         child: Text('Add'),
                       ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                        onPressed: (){},
+                        onLongPress: () {
+                          setState(() {
+                            removeAllDirectories();
+                          });
+                        },
+                        child: Text('Remove all'),
+                      ),
                     ],
                   ),
                 ],
@@ -330,8 +461,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    print("_autoplayInterval" + _autoplayInterval.toString());
-    print("_currentTitle" + _currentTitle);
+    //print("_selectedDirectories " + _selectedDirectories.toString());
+    //print("_imagePaths " + _imagePaths.toString());
+    //print("_autoplayInterval" + _autoplayInterval.toString());
+    //print("_currentTitle" + _currentTitle);
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -346,16 +479,22 @@ class _HomePageState extends State<HomePage> {
         title: Text(_currentTitle),
         actions: [
           IconButton(
-            onPressed: pauseUnpauseSlideShow,
+            onPressed: refreshImagePathsAdvanced,
             icon: const Icon(Icons.refresh),
           ),
+          /*
           IconButton(
-            onPressed: pauseUnpauseSlideShow,
+            onPressed: (){
+              setState(() {
+                pauseUnpauseSlideShow();
+              });
+            },
             icon: _autoplayInterval != 0 ? const Icon(Icons.stop_rounded) : const Icon(Icons.play_arrow_rounded),
           ),
+          */
           IconButton(
             onPressed: chooseDirectories,
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.folder),
           ),
 
         ],
