@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_image_slideshow/flutter_image_slideshow.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:window_manager/window_manager.dart';
 
 /*
 Explanation:
@@ -18,8 +19,22 @@ Explanation:
 - The app is designed to support landscape mode only, and the `SystemChrome.setEnabledSystemUIOverlays` and `SystemChrome.setPreferredOrientations` methods are used to ensure that the app is displayed in landscape mode and with the system UI hidden during folder selection.
 */
 
-void main() {
+Future<void> main() async {
   runApp(MyApp());
+
+  WidgetsFlutterBinding.ensureInitialized();
+// Must add this line.
+  await windowManager.ensureInitialized();
+// Use it only after calling `hiddenWindowAtLaunch`
+  windowManager.waitUntilReadyToShow().then((_) async {
+    // Hide window title bar
+    //await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+    //await windowManager.setFullScreen(true);
+    //await windowManager.center();
+    //wait windowManager.show();
+    //await windowManager.setSkipTaskbar(false);
+    await windowManager.setAsFrameless();
+  });
 }
 
 class Folder {
